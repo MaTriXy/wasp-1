@@ -1,10 +1,5 @@
-package com.orhanobut.waspsample;
+package com.orhanobut.wasp;
 
-import android.content.Context;
-import android.test.InstrumentationTestCase;
-
-import com.orhanobut.wasp.CallBack;
-import com.orhanobut.wasp.Wasp;
 import com.orhanobut.wasp.http.GET;
 import com.orhanobut.wasp.http.Path;
 
@@ -12,25 +7,11 @@ import junit.framework.Assert;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+
 /**
  * @author Orhan Obut
  */
-public class MyServiceTest extends InstrumentationTestCase {
-
-    private static final String TAG = MyServiceTest.class.getSimpleName();
-    
-    Context context;
-
-    @Override
-    protected void setUp() throws Exception {
-        super.setUp();
-
-        System.setProperty(
-                "dexmaker.dexcache",
-                getInstrumentation().getTargetContext().getCacheDir().getPath());
-
-        context = getInstrumentation().getContext();
-    }
+public class MyServiceTest extends BaseTest {
 
     @Override
     protected void tearDown() throws Exception {
@@ -51,12 +32,12 @@ public class MyServiceTest extends InstrumentationTestCase {
                     .setEndpoint("endpoint")
                     .build()
                     .create(Service1.class);
-            Assert.fail("Last param should be callback");
+            fail("Last param should be callback");
         } catch (Exception e) {
             assertThat(e.getMessage());
         }
     }
-    
+
     public interface Service2 {
         @GET("/repos/{user}/{repo}")
         void fetchRepo(@Path("user") String user,

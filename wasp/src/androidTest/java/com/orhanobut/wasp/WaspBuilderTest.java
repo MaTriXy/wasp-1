@@ -1,9 +1,5 @@
-package com.orhanobut.waspsample;
+package com.orhanobut.wasp;
 
-import android.content.Context;
-import android.test.InstrumentationTestCase;
-
-import com.orhanobut.wasp.Wasp;
 import com.orhanobut.wasp.http.Body;
 import com.orhanobut.wasp.http.GET;
 import com.orhanobut.wasp.http.POST;
@@ -12,37 +8,36 @@ import com.orhanobut.wasp.http.Query;
 
 import junit.framework.Assert;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * @author Orhan Obut
  */
-public class WaspBuilderTest extends InstrumentationTestCase {
-
-    private static final String TAG = WaspBuilderTest.class.getSimpleName();
+public class WaspBuilderTest extends BaseTest {
 
     ServiceTest service;
-    Context context;
 
     interface ServiceTest {
         @GET("/repos/{user}/{repo}")
         void fetchRepo(@Path("user") String user,
                        @Path("repo") String repo,
-                       RepoCallBack callBack
+                       CallBack<Repo> callBack
         );
 
         @GET("/users/{user}/repos")
         void fetchRepoBySearch(@Path("user") String user,
                                @Query("page") int pageNumber,
                                @Query("sort") String sort,
-                               RepoSearchCallBack callBack
+                               CallBack<List<Repo>> callBack
         );
 
         @POST("/repos/{user}/{repo}")
         void addName(@Path("user") String user,
                      @Path("repo") String repo,
                      @Body String body,
-                     RepoCallBack callBack
+                     CallBack<Repo> callBack
         );
 
     }
@@ -51,12 +46,6 @@ public class WaspBuilderTest extends InstrumentationTestCase {
     protected void setUp() throws Exception {
         super.setUp();
 
-        System.setProperty(
-                "dexmaker.dexcache",
-                getInstrumentation().getTargetContext().getCacheDir().getPath());
-
-        context = getInstrumentation().getContext();
-
         service = new Wasp.Builder(context)
                 .setEndpoint("endpoint")
                 .build()
@@ -64,12 +53,12 @@ public class WaspBuilderTest extends InstrumentationTestCase {
     }
 
     public void test_activityShouldNotBeNull() {
-        assertThat(context).isNotNull();
+        assertNotNull(context);
 
     }
 
     public void test_serviceShouldNotBeNull() throws Exception {
-        assertThat(service).isNotNull();
+        assertNotNull(service);
     }
 
     public void test_onlyInterfaceShouldBeSupported() {

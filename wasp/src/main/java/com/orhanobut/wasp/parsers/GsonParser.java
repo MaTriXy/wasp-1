@@ -4,12 +4,15 @@ import android.text.TextUtils;
 
 import com.google.gson.Gson;
 
+import java.io.IOException;
 import java.lang.reflect.Type;
 
 /**
  * @author Orhan Obut
  */
 public class GsonParser implements Parser {
+
+    private static final String CONTENT_TYPE = "application/json";
 
     private final Gson gson;
 
@@ -22,7 +25,7 @@ public class GsonParser implements Parser {
     }
 
     @Override
-    public <T> T fromJson(String content, Type type) {
+    public <T> T fromBody(String content, Type type) throws IOException {
         if (TextUtils.isEmpty(content)) {
             return null;
         }
@@ -30,8 +33,13 @@ public class GsonParser implements Parser {
     }
 
     @Override
-    public String toJson(Object body) {
+    public String toBody(Object body) {
         return gson.toJson(body);
+    }
+
+    @Override
+    public String getSupportedContentType() {
+        return CONTENT_TYPE;
     }
 
 }

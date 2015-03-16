@@ -1,23 +1,29 @@
-[![Android Arsenal](https://img.shields.io/badge/Android%20Arsenal-Wasp-brightgreen.svg?style=flat)](https://android-arsenal.com/details/1/1412)
+[![Android Arsenal](https://img.shields.io/badge/Android%20Arsenal-Wasp-brightgreen.svg?style=flat)](https://android-arsenal.com/details/1/1412)    [![API](https://img.shields.io/badge/API-10%2B-brightgreen.svg?style=flat)](https://android-arsenal.com/api?level=10) [![Join the chat at https://gitter.im/orhanobut/wasp](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/orhanobut/wasp?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) [![](https://img.shields.io/badge/AndroidWeekly-%23143-blue.svg)](http://androidweekly.net/issues/issue-143)
 
 #Wasp
-Wasp is compact, complete, easy-in-use and all-in-one network solution. 
+Wasp is a compact and easy to use, 'all-in-one' network solution. Wasp uses the interface approach of retrofit with **Volley** network stack and adds functionalities such as **MOCK**, **Certificate management**, **Cookie management** and more. Basically it provides a universal solution for all your networking needs.
 
-Wasp uses:
-- Volley
-- Gson
-- OkHttp
+<img src='https://github.com/orhanobut/wasp/blob/master/images/logo_wasp.png' width='128' height='128'/>
+
+Wasp internally uses:
+- Volley for the network stack
+- Gson for parsing
+- OkHttp for the http stack
 
 Wasp provides:
 - Easy implementation
-- Mocking network calls
-- Request Interceptor to add attributes (query params, headers, retry policy) to each call
-- Call based headers
+- **MOCK** response via text file or **auto generated** from model class!
+- Request Interceptors to add attributes (query params, headers, retry policy) to each call
+- **Call based headers**
 - Call based endpoint url
 - Call based retry policy
-- Cookie management
-- Certicate management
-- Image loading in an easy way
+- **Cookie management**
+- **Certificate management**
+- Painless Image loading
+
+Wasp aims :
+- There are many open issues to contribute. Get this chance to contribute and improve your knowledge!
+- We want to make something that is useful and also motivates people to contribute
 
 ###Add dependency
 ```groovy
@@ -25,11 +31,11 @@ repositories {
     maven { url "https://oss.sonatype.org/content/repositories/snapshots/"}
 }
 dependencies {
-    compile 'com.orhanobut:wasp:1.4-SNAPSHOT'
+    compile 'com.orhanobut:wasp:1.7-SNAPSHOT'
 }
 ```
 
-####Create a service interface.
+####Create a service interface
 
 ```java
 public interface GitHubService {
@@ -53,6 +59,7 @@ public interface GitHubService {
 }
 ```
 
+
 ####Initialize the wasp
 
 ```java
@@ -66,7 +73,7 @@ GitHubService service = new Wasp.Builder(this)
     .create(MyService.class);
 ```
 
-####And use it everywhere
+####And use it everywhere!
 
 ```java
 service.fetchRepo("github","wasp", new CallBack<List<Repo>>{
@@ -96,11 +103,40 @@ Wasp.Image.from(url)
       .load();
 ```
 
+####ProGuard
+
+If you are using ProGuard you should add the following options to your configuration file:
+**Note:** Other than these options you may also need to keep your network related model classes.
+
+```
+#Wasp
+-keepattributes *Annotation*
+-keep class com.orhanobut.wasp.** { *; }
+-keepclassmembernames interface * {
+    @com.orhanobut.wasp.http.* <methods>;
+}
+
+#Gson
+-keep class com.google.gson.** { *; }
+-keepattributes Signature
+
+#OkHttp
+-dontwarn com.squareup.okhttp.**
+-dontwarn java.nio.file.*
+-dontwarn org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement
+```
+
 ####For more details, check the website
 http://orhanobut.github.io/wasp/
 
-###TODO
-Check wiki
+
+<img src='https://github.com/orhanobut/wasp/blob/master/images/wasp-diagram.png'/>
+
+#### You might also like
+- [Hawk](https://github.com/orhanobut/hawk) Secure simple key-value storage
+- [Bee](https://github.com/orhanobut/bee) QA/Debug tool
+- [DialogPlus](https://github.com/orhanobut/dialogplus) Easy, simple dialog solution
+- [SimpleListView](https://github.com/orhanobut/simplelistview) Simple basic listview implementation with linearlayout
 
 ###License
 <pre>
