@@ -9,12 +9,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Sets end point url
- *
- * @author Orhan Obut
  */
 @Documented
 @Target(METHOD)
 @Retention(RUNTIME)
 public @interface EndPoint {
-    String value();
+  String value();
 }

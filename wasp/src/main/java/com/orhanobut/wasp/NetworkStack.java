@@ -1,9 +1,8 @@
 package com.orhanobut.wasp;
 
-/**
- * @author Orhan Obut
- */
-interface NetworkStack {
+public interface NetworkStack {
 
-    <T> void invokeRequest(WaspRequest waspRequest, CallBack<T> callBack);
+  void invokeRequest(RequestCreator requestCreator, InternalCallback<Response> waspCallback);
+
+  Object invokeRequest(RequestCreator requestCreator) throws Exception;
 }

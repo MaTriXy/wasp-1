@@ -1,11 +1,8 @@
 package com.orhanobut.wasp;
 
-/**
- * @author Orhan Obut
- */
 interface ImageHandler {
 
-    void load(WaspImage waspImage);
+  void load(ImageCreator waspImageCreator);
 
-    void clearCache();
+  void clearCache();
 }

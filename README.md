@@ -1,9 +1,17 @@
 [![Android Arsenal](https://img.shields.io/badge/Android%20Arsenal-Wasp-brightgreen.svg?style=flat)](https://android-arsenal.com/details/1/1412)    [![API](https://img.shields.io/badge/API-10%2B-brightgreen.svg?style=flat)](https://android-arsenal.com/api?level=10) [![Join the chat at https://gitter.im/orhanobut/wasp](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/orhanobut/wasp?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge) [![](https://img.shields.io/badge/AndroidWeekly-%23143-blue.svg)](http://androidweekly.net/issues/issue-143)
 
-#Wasp
-Wasp is a compact and easy to use, 'all-in-one' network solution. Wasp uses the interface approach of retrofit with **Volley** network stack and adds functionalities such as **MOCK**, **Certificate management**, **Cookie management** and more. Basically it provides a universal solution for all your networking needs.
+<img align='right' src='https://github.com/orhanobut/wasp/blob/master/images/logo_wasp.png' width='128' height='128'/>
 
-<img src='https://github.com/orhanobut/wasp/blob/master/images/logo_wasp.png' width='128' height='128'/>
+# Deprecated
+Unfortunately due to many reasons including maintenance cost, this library is deprecated. I recommend to use Retrofit/OkHttp instead. Currently this project only aims to provide some experimental functionalities.
+
+# Wasp
+A compact and easy to use, 'all-in-one' network solution. 
+
+<img src='https://github.com/orhanobut/wasp/blob/master/images/wasp-diagram.png'/>
+
+#### The problem
+When it comes to daily development, you need more than just a library to handle networking, you need to handle mocking calls, using multiple end points, handling certificates and cookies and many other boiler plate code. With wasp, you can easily handle everything.
 
 Wasp internally uses:
 - Volley for the network stack
@@ -14,131 +22,118 @@ Wasp provides:
 - Easy implementation
 - **MOCK** response via text file or **auto generated** from model class!
 - Request Interceptors to add attributes (query params, headers, retry policy) to each call
-- **Call based headers**
-- Call based endpoint url
-- Call based retry policy
+- **Api call based headers**
+- Api call based end point
+- Api call based retry policy
 - **Cookie management**
 - **Certificate management**
 - Painless Image loading
+- **RxJava support**
+- **Request cancelation**
+- Sync request call
+- Async request call
 
 Wasp aims :
 - There are many open issues to contribute. Get this chance to contribute and improve your knowledge!
 - We want to make something that is useful and also motivates people to contribute
 
-###Add dependency
+### Add dependency
+More info https://jitpack.io/#orhanobut/wasp/1.15
 ```groovy
 repositories {
-    maven { url "https://oss.sonatype.org/content/repositories/snapshots/"}
+  // ...
+  maven { url "https://jitpack.io" }
 }
+
 dependencies {
-    compile 'com.orhanobut:wasp:1.7-SNAPSHOT'
+  compile 'com.github.orhanobut:wasp:1.15'
 }
 ```
 
-####Create a service interface
+#### Create a service interface
 
 ```java
 public interface GitHubService {
 
-    @GET("/repos/{user}/{repo}")
-    void fetchRepo(
-           @Path("user") String user,
-           @Path("repo") String repo,
-           CallBack<Repo> callBack
-    );
-
-    @Mock
-    @Headers 
-    @POST("/repos/{user}")
-    void addName(
-          @Path("user") String user,
-          @Header("auth") String authToken,
-          @Body Repo repo,
-          CallBack<Repo> callBack
-    );
+  // Async call
+  @GET("/repos/{id}")
+  void getRepo(@Path("id") String id, Callback<Repo> callback);
+  
+  // Async call with WaspRequest (cancelable)
+  @GET("/repos/{id}")
+  WaspRequest getRepo(@Path("id") String id, Callback<Repo> callback);
+    
+  // Rx
+  @Mock
+  @POST("/repos")
+  Observable<Repo> createRepo(@Body Repo repo);
+  
+  // sync call
+  @GET("/users/{id}")
+  User getUser(@Path("id") String id);
 }
 ```
 
-
-####Initialize the wasp
+#### Initialize the wasp
 
 ```java
 GitHubService service = new Wasp.Builder(this)
-    .setEndpoint("https://api.github.com")
-    .setRequestInterceptor                     // Optional
-    .trustCertificates                         // Optional
-    .setHttpStack                              // Optional
-    .enableCookies                             // Optional
-    .build()
-    .create(MyService.class);
+  .setEndpoint("https://api.github.com")
+  .setRequestInterceptor                     // Optional
+  .trustCertificates                         // Optional
+  .setHttpStack                              // Optional
+  .enableCookies                             // Optional
+  .setNetworkMode(NetworkMode.MOCK)          // Optional(Used for Mock)
+  .build()
+  .create(GitHubService.class);
 ```
 
-####And use it everywhere!
-
+#### And use it everywhere!
+Async
 ```java
-service.fetchRepo("github","wasp", new CallBack<List<Repo>>{
-    
-    @Override
-    public void onSuccess(List<Repo> repos) {
-        // do something
-    }
-    
-    @Override
-    public void onError(WaspError error) {
-        // handle error
-    }
+service.getRepo(id, new Callback<Repo>{
+
+  @Override
+  public void onSuccess(Response response, Repo repo) {
+    // do something
+  }
+  
+  @Override
+  public void onError(WaspError error) {
+    // handle error
+  }
 });
 ```
 
-####Load images easily
-
+Async with WaspRequest (cancelable)
 ```java
-Wasp.Image.from(url)
-      .to(imageView)
-      .setErrorResource(errorImage)     // Optional
-      .setDefaultResource(defaulImage)  // Optional
-      .fit()                            // Optional, in TODO
-      .cropCenter()                     // Optional, in TODO
-      .resize(100,200)                  // Optional, in TODO
-      .load();
+WaspRequest request = service.getRepo(id, new Callback<Repo>{
+
+  @Override
+  public void onSuccess(Response response, Repo repo) {
+    // do something
+  }
+  
+  @Override
+  public void onError(WaspError error) {
+    // handle error
+  }
+});
+request.cancel();  //cancels the request
 ```
 
-####ProGuard
-
-If you are using ProGuard you should add the following options to your configuration file:
-**Note:** Other than these options you may also need to keep your network related model classes.
-
-```
-#Wasp
--keepattributes *Annotation*
--keep class com.orhanobut.wasp.** { *; }
--keepclassmembernames interface * {
-    @com.orhanobut.wasp.http.* <methods>;
-}
-
-#Gson
--keep class com.google.gson.** { *; }
--keepattributes Signature
-
-#OkHttp
--dontwarn com.squareup.okhttp.**
--dontwarn java.nio.file.*
--dontwarn org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement
+Rx
+```java
+Observable<Repo> observable = service.createRepo(repo);
 ```
 
-####For more details, check the website
-http://orhanobut.github.io/wasp/
+Sync
+```java
+User user = service.getUser(id);
+```
+#### Check wiki for more details
 
-
-<img src='https://github.com/orhanobut/wasp/blob/master/images/wasp-diagram.png'/>
-
-#### You might also like
-- [Hawk](https://github.com/orhanobut/hawk) Secure simple key-value storage
-- [Bee](https://github.com/orhanobut/bee) QA/Debug tool
-- [DialogPlus](https://github.com/orhanobut/dialogplus) Easy, simple dialog solution
-- [SimpleListView](https://github.com/orhanobut/simplelistview) Simple basic listview implementation with linearlayout
-
-###License
+### License
 <pre>
 Copyright 2014 Orhan Obut
 

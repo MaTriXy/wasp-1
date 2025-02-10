@@ -7,14 +7,17 @@ import com.orhanobut.wasp.http.Auth;
 import com.orhanobut.wasp.http.Body;
 import com.orhanobut.wasp.http.BodyMap;
 import com.orhanobut.wasp.http.EndPoint;
+import com.orhanobut.wasp.http.FormUrlEncoded;
 import com.orhanobut.wasp.http.Header;
 import com.orhanobut.wasp.http.Headers;
 import com.orhanobut.wasp.http.Mock;
+import com.orhanobut.wasp.http.Multipart;
 import com.orhanobut.wasp.http.Path;
 import com.orhanobut.wasp.http.Query;
 import com.orhanobut.wasp.http.RestMethod;
 import com.orhanobut.wasp.http.RetryPolicy;
 import com.orhanobut.wasp.utils.IOUtils;
+import com.orhanobut.wasp.utils.MimeTypes;
 import com.orhanobut.wasp.utils.WaspRetryPolicy;
 
 import java.lang.annotation.Annotation;
@@ -28,267 +31,324 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * @author Orhan Obut
- */
+import rx.Observable;
+
 final class MethodInfo {
 
-    private static final int HEAD_VALUE_LENGTH = 2;
+  private static final int HEAD_VALUE_LENGTH = 2;
 
-    private final Context context;
-    private final Method method;
+  private final Context context;
+  private final Method method;
 
-    private String baseUrl;
-    private String relativeUrl;
-    private String httpMethod;
-    private WaspRetryPolicy retryPolicy;
-    private Type responseObjectType;
-    private Annotation[] methodAnnotations;
-    private Map<String, String> headers;
-    private WaspMock mock;
-    private boolean isAuthTokenEnabled;
+  private String baseUrl;
+  private String relativeUrl;
+  private String httpMethod;
+  private String contentType;
+  private WaspRetryPolicy retryPolicy;
+  private Type responseObjectType;
+  private Annotation[] methodAnnotations;
+  private Map<String, String> headers;
+  private MockHolder mock;
+  private boolean isAuthTokenEnabled;
+  private ReturnType returnType;
 
-    private MethodInfo(Context context, Method method) {
-        this.context = context;
-        this.method = method;
-        init();
-    }
+  enum ReturnType {
+    REQUEST, OBSERVABLE, SYNC, VOID
+  }
 
-    synchronized void init() {
-        parseMethodAnnotations();
-        parseResponseObjectType();
-        parseParamAnnotations();
-    }
+  private MethodInfo(Context context, Method method) {
+    this.context = context;
+    this.method = method;
+    init();
+  }
 
-    static MethodInfo newInstance(Context context, Method method) {
-        return new MethodInfo(context, method);
-    }
+  synchronized void init() {
+    parseMethodAnnotations();
+    parseReturnType();
+    parseParamAnnotations();
+  }
 
-    private void parseMethodAnnotations() {
-        Annotation[] annotations = method.getAnnotations();
-        for (Annotation annotation : annotations) {
-            Class<? extends Annotation> annotationType = annotation.annotationType();
+  static MethodInfo newInstance(Context context, Method method) {
+    return new MethodInfo(context, method);
+  }
 
-            if (annotationType == Headers.class) {
-                String[] headers = ((Headers) annotation).value();
-                if (headers == null) {
-                    throw new NullPointerException("HEAD value may not be null");
-                }
-                addHeaders(headers);
-                continue;
-            }
+  private void parseMethodAnnotations() {
+    Annotation[] annotations = method.getAnnotations();
+    for (Annotation annotation : annotations) {
+      Class<? extends Annotation> annotationType = annotation.annotationType();
 
-            if (annotationType == RetryPolicy.class) {
-                RetryPolicy policy = (RetryPolicy) annotation;
-                retryPolicy = new WaspRetryPolicy(
-                        policy.timeout(), policy.maxNumRetries(), policy.backoffMultiplier()
-                );
-                continue;
-            }
-
-            if (annotationType == EndPoint.class) {
-                EndPoint endPoint = (EndPoint) annotation;
-                baseUrl = endPoint.value();
-                continue;
-            }
-
-            if (annotationType == Auth.class) {
-                isAuthTokenEnabled = true;
-                continue;
-            }
-
-            if (annotationType == Mock.class) {
-                Mock mock = (Mock) annotation;
-
-                String path = mock.path();
-                if (!TextUtils.isEmpty(path) && !IOUtils.assetsFileExists(context, path)) {
-                    throw new RuntimeException("Could not find given file for \"" +
-                            method.getDeclaringClass().getSimpleName() + "." + method.getName() + "\""
-                    );
-                }
-                this.mock = new WaspMock(mock.statusCode(), path);
-                continue;
-            }
-
-            RestMethod methodInfo = null;
-
-            // Look for a @RestMethod annotation on the parameter annotation indicating request method.
-            for (Annotation innerAnnotation : annotationType.getAnnotations()) {
-                if (RestMethod.class == innerAnnotation.annotationType()) {
-                    methodInfo = (RestMethod) innerAnnotation;
-                    break;
-                }
-            }
-            if (methodInfo == null) {
-                throw new NullPointerException("method annotation may not be null");
-            }
-            String path;
-            try {
-                path = (String) annotationType.getMethod("value").invoke(annotation);
-            } catch (Exception e) {
-                throw methodError("Failed to extract String 'value' from @%s annotation.",
-                        annotationType.getSimpleName());
-            }
-            relativeUrl = path;
-            httpMethod = methodInfo.value();
+      if (annotationType == Headers.class) {
+        String[] headers = ((Headers) annotation).value();
+        if (headers == null) {
+          throw new NullPointerException("HEAD value may not be null");
         }
-    }
+        addHeaders(headers);
+        continue;
+      }
 
-    private void addHeaders(String[] values) {
-        for (String header : values) {
-            String[] strings = header.split(":");
-            if (strings.length != HEAD_VALUE_LENGTH) {
-                throw new IllegalArgumentException("HEAD value must follow key : value format");
-            }
-            if (headers == null) {
-                headers = new HashMap<>();
-            }
-            headers.put(strings[0], strings[1]);
+      if (annotationType == RetryPolicy.class) {
+        RetryPolicy policy = (RetryPolicy) annotation;
+        retryPolicy = new WaspRetryPolicy(
+            policy.timeout(), policy.maxNumRetries(), policy.backoffMultiplier()
+        );
+        continue;
+      }
+
+      if (annotationType == EndPoint.class) {
+        EndPoint endPoint = (EndPoint) annotation;
+        baseUrl = endPoint.value();
+        continue;
+      }
+
+      if (annotationType == Auth.class) {
+        isAuthTokenEnabled = true;
+        continue;
+      }
+
+      if (annotationType == Mock.class) {
+        Mock mock = (Mock) annotation;
+
+        String path = mock.path();
+        if (!TextUtils.isEmpty(path) && !IOUtils.assetsFileExists(context, path)) {
+          throw new RuntimeException("Could not find given file for \""
+              + method.getDeclaringClass().getSimpleName() + "." + method.getName() + "\""
+          );
         }
-    }
+        this.mock = new MockHolder(mock.statusCode(), path);
+        continue;
+      }
 
-    private void parseResponseObjectType() {
-        Type[] parameterTypes = method.getGenericParameterTypes();
-        if (parameterTypes.length == 0) {
-            throw new IllegalArgumentException("Callback should be added as param");
+      if (annotationType == FormUrlEncoded.class) {
+        contentType = MimeTypes.CONTENT_TYPE_FORM_URL_ENCODED;
+        continue;
+      }
+
+      if (annotationType == Multipart.class) {
+        contentType = MimeTypes.CONTENT_TYPE_MULTIPART;
+        continue;
+      }
+
+      RestMethod methodInfo = null;
+
+      // Look for a @RestMethod annotation on the parameter annotation indicating request method.
+      for (Annotation innerAnnotation : annotationType.getAnnotations()) {
+        if (RestMethod.class == innerAnnotation.annotationType()) {
+          methodInfo = (RestMethod) innerAnnotation;
+          break;
         }
-        Type lastArgType;
-        Class<?> lastArgClass = null;
+      }
+      if (methodInfo == null) {
+        throw new NullPointerException("method annotation may not be null");
+      }
+      String path;
+      try {
+        path = (String) annotationType.getMethod("value").invoke(annotation);
+      } catch (Exception e) {
+        throw methodError("Failed to extract String 'value' from @%s annotation.",
+            annotationType.getSimpleName());
+      }
+      relativeUrl = path;
+      httpMethod = methodInfo.value();
+    }
+  }
 
-        Type typeToCheck = parameterTypes[parameterTypes.length - 1];
-        lastArgType = typeToCheck;
-        if (typeToCheck instanceof ParameterizedType) {
-            typeToCheck = ((ParameterizedType) typeToCheck).getRawType();
+  private void addHeaders(String[] values) {
+    for (String header : values) {
+      String[] strings = header.split(":");
+      if (strings.length != HEAD_VALUE_LENGTH) {
+        throw new IllegalArgumentException("HEAD value must follow key : value format");
+      }
+      if (headers == null) {
+        headers = new HashMap<>();
+      }
+      headers.put(strings[0], strings[1]);
+    }
+  }
+
+  private void parseCallbackResponseObjectType() {
+    Type[] parameterTypes = method.getGenericParameterTypes();
+    if (parameterTypes.length == 0) {
+      throw new IllegalArgumentException("Callback should be added as param");
+    }
+    Type lastArgType;
+    Class<?> lastArgClass = null;
+
+    Type typeToCheck = parameterTypes[parameterTypes.length - 1];
+    lastArgType = typeToCheck;
+    if (typeToCheck instanceof ParameterizedType) {
+      typeToCheck = ((ParameterizedType) typeToCheck).getRawType();
+    }
+    if (typeToCheck instanceof Class) {
+      lastArgClass = (Class<?>) typeToCheck;
+    }
+    if (!Callback.class.isAssignableFrom(lastArgClass)) {
+      throw new IllegalArgumentException("Last param should be CallBack");
+    }
+
+    lastArgType = RetroTypes.getSupertype(
+        lastArgType, RetroTypes.getRawType(lastArgType),
+        Callback.class
+    );
+    if (lastArgType instanceof ParameterizedType) {
+      responseObjectType = getParameterUpperBound((ParameterizedType) lastArgType);
+    }
+  }
+
+  private void parseObservableResponseObjectType() {
+    Type type = method.getGenericReturnType();
+    Class rawType = RetroTypes.getRawType(type);
+    Type returnType = RetroTypes.getSupertype(type, rawType, Observable.class);
+    responseObjectType = getParameterUpperBound((ParameterizedType) returnType);
+  }
+
+  private void parseParamAnnotations() {
+    Annotation[][] annotationArrays = method.getParameterAnnotations();
+    methodAnnotations = new Annotation[annotationArrays.length];
+
+    List<String> pathParams = new ArrayList<>();
+    List<String> queryParams = new ArrayList<>();
+    List<String> headerParams = new ArrayList<>();
+    boolean isBodyAdded = false;
+
+    int count = annotationArrays.length;
+    for (int i = 0; i < count; i++) {
+      Annotation annotationResult = null;
+      for (Annotation annotation : annotationArrays[i]) {
+        Class<? extends Annotation> annotationType = annotation.annotationType();
+        if (annotationType == Path.class) {
+          //TODO validate
+          String value = ((Path) annotation).value();
+          if (pathParams.contains(value)) {
+            throw new IllegalArgumentException("Path name should not be duplicated");
+          }
+          pathParams.add(value);
         }
-        if (typeToCheck instanceof Class) {
-            lastArgClass = (Class<?>) typeToCheck;
+        if (annotationType == Body.class) {
+          if (isBodyAdded) {
+            throw new IllegalArgumentException("Only one body/bodyMap can be added");
+          }
+          isBodyAdded = true;
         }
-        if (!CallBack.class.isAssignableFrom(lastArgClass)) {
-            throw new IllegalArgumentException("Last param should be CallBack");
+        if (annotationType == BodyMap.class) {
+          if (isBodyAdded) {
+            throw new IllegalArgumentException("Only one body/bodyMap can be added");
+          }
+          isBodyAdded = true;
+        }
+        if (annotationType == Query.class) {
+          //TODO validate
+          String value = ((Query) annotation).value();
+          if (queryParams.contains(value)) {
+            throw new IllegalArgumentException("Query name should not be duplicated");
+          }
+          queryParams.add(value);
+        }
+        if (annotationType == Header.class) {
+          String value = ((Header) annotation).value();
+          if (headerParams.contains(value)) {
+            throw new IllegalArgumentException("Header name should not be duplicated");
+          }
+          headerParams.add(value);
         }
 
-        lastArgType = RetroTypes.getSupertype(lastArgType, RetroTypes.getRawType(lastArgType), CallBack.class);
-        if (lastArgType instanceof ParameterizedType) {
-            responseObjectType = getParameterUpperBound((ParameterizedType) lastArgType);
-        }
+        annotationResult = annotation;
+      }
+      methodAnnotations[i] = annotationResult;
     }
+  }
 
-    private void parseParamAnnotations() {
-        Annotation[][] annotationArrays = method.getParameterAnnotations();
-        methodAnnotations = new Annotation[annotationArrays.length];
+  private void parseReturnType() {
+    Type type = method.getGenericReturnType();
+    Class clazz = RetroTypes.getRawType(type);
 
-        List<String> pathParams = new ArrayList<>();
-        List<String> queryParams = new ArrayList<>();
-        List<String> headerParams = new ArrayList<>();
-        boolean isBodyAdded = false;
-
-        int count = annotationArrays.length;
-        for (int i = 0; i < count; i++) {
-            Annotation annotationResult = null;
-            for (Annotation annotation : annotationArrays[i]) {
-                Class<? extends Annotation> annotationType = annotation.annotationType();
-                if (annotationType == Path.class) {
-                    //TODO validate
-                    String value = ((Path) annotation).value();
-                    if (pathParams.contains(value)) {
-                        throw new IllegalArgumentException("Path name should not be duplicated");
-                    }
-                    pathParams.add(value);
-                }
-                if (annotationType == Body.class) {
-                    if (isBodyAdded) {
-                        throw new IllegalArgumentException("Only one body/bodyMap can be added");
-                    }
-                    isBodyAdded = true;
-                }
-                if (annotationType == BodyMap.class) {
-                    if (isBodyAdded) {
-                        throw new IllegalArgumentException("Only one body/bodyMap can be added");
-                    }
-                    isBodyAdded = true;
-                }
-                if (annotationType == Query.class) {
-                    //TODO validate
-                    String value = ((Query) annotation).value();
-                    if (queryParams.contains(value)) {
-                        throw new IllegalArgumentException("Query name should not be duplicated");
-                    }
-                    queryParams.add(value);
-                }
-                if (annotationType == Header.class) {
-                    String value = ((Header) annotation).value();
-                    if (headerParams.contains(value)) {
-                        throw new IllegalArgumentException("Header name should not be duplicated");
-                    }
-                    headerParams.add(value);
-                }
-
-                annotationResult = annotation;
-            }
-            methodAnnotations[i] = annotationResult;
-        }
+    // async operation with callback
+    if (type == void.class) {
+      returnType = ReturnType.VOID;
+      parseCallbackResponseObjectType();
+      return;
     }
-
-    private static Type getParameterUpperBound(ParameterizedType type) {
-        Type[] types = type.getActualTypeArguments();
-        for (int i = 0; i < types.length; i++) {
-            Type paramType = types[i];
-            if (paramType instanceof WildcardType) {
-                types[i] = ((WildcardType) paramType).getUpperBounds()[0];
-            }
-        }
-        return types[0];
+    if (Utils.hasRxJavaOnClasspath() && Observable.class.isAssignableFrom(clazz)) {
+      returnType = ReturnType.OBSERVABLE;
+      parseObservableResponseObjectType();
+      return;
     }
-
-    private RuntimeException methodError(String message, Object... args) {
-        if (args.length > 0) {
-            message = String.format(message, args);
-        }
-        return new IllegalArgumentException(
-                method.getDeclaringClass().getSimpleName() + "." + method.getName() + ": " + message);
+    if (WaspRequest.class.isAssignableFrom(clazz)) {
+      returnType = ReturnType.REQUEST;
+      parseCallbackResponseObjectType();
+      return;
     }
+    returnType = ReturnType.SYNC;
+    responseObjectType = type;
+  }
 
-    public Method getMethod() {
-        return method;
+  private static Type getParameterUpperBound(ParameterizedType type) {
+    Type[] types = type.getActualTypeArguments();
+    for (int i = 0; i < types.length; i++) {
+      Type paramType = types[i];
+      if (paramType instanceof WildcardType) {
+        types[i] = ((WildcardType) paramType).getUpperBounds()[0];
+      }
     }
+    return types[0];
+  }
 
-    String getRelativeUrl() {
-        return relativeUrl;
+  private RuntimeException methodError(String message, Object... args) {
+    if (args.length > 0) {
+      message = String.format(message, args);
     }
+    return new IllegalArgumentException(
+        method.getDeclaringClass().getSimpleName() + "." + method.getName() + ": " + message);
+  }
 
-    String getBaseUrl() {
-        return baseUrl;
-    }
+  public Method getMethod() {
+    return method;
+  }
 
-    String getHttpMethod() {
-        return httpMethod;
-    }
+  String getRelativeUrl() {
+    return relativeUrl;
+  }
 
-    boolean isMocked() {
-        return mock != null;
-    }
+  String getBaseUrl() {
+    return baseUrl;
+  }
 
-    WaspRetryPolicy getRetryPolicy() {
-        return retryPolicy;
-    }
+  String getHttpMethod() {
+    return httpMethod;
+  }
 
-    Type getResponseObjectType() {
-        return responseObjectType;
-    }
+  boolean isMocked() {
+    return mock != null;
+  }
 
-    Annotation[] getMethodAnnotations() {
-        return methodAnnotations;
-    }
+  WaspRetryPolicy getRetryPolicy() {
+    return retryPolicy;
+  }
 
-    Map<String, String> getHeaders() {
-        return headers != null ? headers : Collections.<String, String>emptyMap();
-    }
+  Type getResponseObjectType() {
+    return responseObjectType;
+  }
 
-    WaspMock getMock() {
-        return mock;
-    }
+  Annotation[] getMethodAnnotations() {
+    return methodAnnotations;
+  }
 
-    boolean isAuthTokenEnabled() {
-        return isAuthTokenEnabled;
-    }
+  Map<String, String> getHeaders() {
+    return headers != null ? headers : Collections.<String, String>emptyMap();
+  }
+
+  MockHolder getMock() {
+    return mock;
+  }
+
+  boolean isAuthTokenEnabled() {
+    return isAuthTokenEnabled;
+  }
+
+  public String getContentType() {
+    return contentType;
+  }
+
+  public ReturnType getReturnType() {
+    return returnType;
+  }
 }

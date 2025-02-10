@@ -1,27 +1,73 @@
 apply plugin: 'com.android.library'
+apply plugin: 'com.github.dcendents.android-maven'
+apply plugin: 'checkstyle'
 
 android {
-    compileSdkVersion 21
-    buildToolsVersion "21.1.2"
+  compileSdkVersion 21
+  buildToolsVersion "21.1.1"
 
-    defaultConfig {
-        minSdkVersion 10
-        targetSdkVersion 21
-        versionCode 1
-        versionName "1.0"
-    }
+  defaultConfig {
+    minSdkVersion 10
+    targetSdkVersion 21
+    consumerProguardFiles 'consumer-proguard-rules.pro'
+  }
 
-    lintOptions {
-        abortOnError false
-    }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+check.dependsOn 'checkstyle'
+
+task checkstyle(type: Checkstyle) {
+  configFile file("${project.rootDir}/checkstyle.xml")
+  source 'src'
+  include '**/*.java'
+  exclude '**/gen/**'
+
+  // empty classpath
+  classpath = files()
+}
+
+// build a jar with source files
+task sourcesJar(type: Jar) {
+  from android.sourceSets.main.java.srcDirs
+  classifier = 'sources'
+}
+
+task javadoc(type: Javadoc) {
+  failOnError  false
+  source = android.sourceSets.main.java.sourceFiles
+  classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
+}
+
+// build a jar with javadoc
+task javadocJar(type: Jar, dependsOn: javadoc) {
+  classifier = 'javadoc'
+  from javadoc.destinationDir
+}
+
+artifacts {
+  archives sourcesJar
+  archives javadocJar
+}
+
+configurations {
+  optional
+  compile.extendsFrom optional
 }
 
 dependencies {
-    compile 'com.mcxiaoke.volley:library:1.0.10'
-    compile 'com.google.code.gson:gson:2.3'
-    compile 'com.squareup.okhttp:okhttp:2.2.0'
-    androidTestCompile 'org.assertj:assertj-core:1.7.0'
+  compile 'com.mcxiaoke.volley:library:1.0.18'
+  compile 'com.google.code.gson:gson:2.3.1'
+  compile 'com.squareup.okhttp:okhttp:2.5.0'
+
+  optional 'io.reactivex:rxandroid:0.25.0'
+
+  testCompile 'junit:junit:4.12'
+  testCompile "org.mockito:mockito-core:1.9.5"
+  testCompile "org.robolectric:robolectric:3.0"
+  testCompile 'org.assertj:assertj-core:1.7.0'
+  testCompile 'com.squareup.okhttp:mockwebserver:2.5.0'
 
 }
-
-apply from: '../maven_push.gradle'

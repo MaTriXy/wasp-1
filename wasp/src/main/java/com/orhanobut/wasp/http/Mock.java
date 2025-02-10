@@ -9,13 +9,12 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Enables the mocking for the network regarding to mock type
- *
- * @author Orhan Obut
  */
 @Documented
 @Target(METHOD)
 @Retention(RUNTIME)
 public @interface Mock {
-    int statusCode() default 200;
-    String path() default "";
+  int statusCode() default 200;
+
+  String path() default "";
 }

@@ -9,12 +9,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Define the path of the endpoint
- *
- * @author Orhan Obut
  */
 @Documented
 @Target(PARAMETER)
 @Retention(RUNTIME)
 public @interface Path {
-    String value();
+  String value();
 }

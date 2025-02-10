@@ -1,19 +1,18 @@
 package com.orhanobut.wasp;
 
-/**
- * @author Orhan Obut
- */
 final class ResponseWrapper<T> {
 
-    private final CallBack<T> callBack;
-    private final T response;
+  private final Callback<T> callback;
+  private final T response;
+  private final Response waspResponse;
 
-    public ResponseWrapper(CallBack<T> callBack, T response) {
-        this.callBack = callBack;
-        this.response = response;
-    }
+  public ResponseWrapper(Callback<T> callback, Response waspResponse, T response) {
+    this.callback = callback;
+    this.response = response;
+    this.waspResponse = waspResponse;
+  }
 
-    void submitResponse() {
-        callBack.onSuccess(response);
-    }
+  void submitResponse() {
+    callback.onSuccess(waspResponse, response);
+  }
 }

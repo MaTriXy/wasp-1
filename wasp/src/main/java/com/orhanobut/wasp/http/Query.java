@@ -9,12 +9,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Define the query param to append to the url
- *
- * @author Orhan Obut
  */
 @Documented
 @Target(PARAMETER)
 @Retention(RUNTIME)
 public @interface Query {
-    String value();
+  String value();
 }
